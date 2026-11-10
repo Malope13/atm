@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ATM</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, sans-serif;
+      background: #eef2f6;
+      color: #172033;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    main {
+      width: min(100%, 380px);
+      padding: 28px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 12px 36px #1720331a;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      color: #145c45;
+      font-size: 1.7rem;
+    }
+
+    p {
+      color: #647084;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      margin: 18px 0 7px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd3dd;
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      border: 0;
+      border-radius: 8px;
+      background: #167653;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #105c40;
+    }
+
+    button.secondary {
+      background: #e8edf2;
+      color: #172033;
+    }
+
+    button.secondary:hover {
+      background: #dce3ea;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    #message {
+      min-height: 24px;
+      margin-bottom: 0;
+      font-weight: 600;
+    }
+
+    #message.error {
+      color: #b42318;
+    }
+
+    #message.success {
+      color: #167653;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Welcome to the ATM</h1>
+    <p id="subtitle">Enter your PIN to continue.</p>
+
+    <section id="pin-section">
+      <form id="pin-form">
+        <label for="pin">PIN</label>
+        <input id="pin" type="password" inputmode="numeric" autocomplete="off" required>
+        <button type="submit">Continue</button>
+      </form>
+    </section>
+
+    <section id="menu-section" hidden>
+      <button type="button" id="balance-button">Check balance</button>
+      <button type="button" id="deposit-button">Deposit cash</button>
+      <button type="button" id="withdraw-button">Withdraw cash</button>
+      <button type="button" class="secondary" id="exit-button">Exit</button>
+    </section>
+
+    <section id="amount-section" hidden>
+      <form id="amount-form">
+        <label id="amount-label" for="amount">Amount</label>
+        <input id="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required>
+        <button type="submit" id="amount-submit">Submit</button>
+        <button type="button" class="secondary" id="cancel-button">Cancel</button>
+      </form>
+    </section>
+
+    <p id="message" role="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    "use strict";
+
+    const ATM_PIN = "1234";
+    const MAX_PIN_ATTEMPTS = 3;
+    let pinAttempts = 0;
+    let balanceCents = 100000;
+    let transaction = null;
+
+    const pinSection = document.getElementById("pin-section");
+    const menuSection = document.getElementById("menu-section");
+    const amountSection = document.getElementById("amount-section");
+    const message = document.getElementById("message");
+    const subtitle = document.getElementById("subtitle");
+    const pinInput = document.getElementById("pin");
+    const amountInput = document.getElementById("amount");
+
+    function showMessage(text, type = "") {
+      message.textContent = text;
+      message.className = type;
+    }
+
+    document.getElementById("pin-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (pinInput.value === ATM_PIN) {
+        pinSection.hidden = true;
+        menuSection.hidden = false;
+        subtitle.textContent = "Choose an option.";
+        showMessage("");
+        return;
+      }
+
+      pinAttempts += 1;
+      pinInput.value = "";
+      if (pinAttempts >= MAX_PIN_ATTEMPTS) {
+        pinInput.disabled = true;
+        document.querySelector("#pin-form button").disabled = true;
+        showMessage("Too many incorrect attempts. Access denied.", "error");
+      } else {
+        showMessage("Incorrect PIN.", "error");
+      }
+    });
+
+    document.getElementById("balance-button").addEventListener("click", () => {
+      showMessage(`Your balance is $${(balanceCents / 100).toFixed(2)}`, "success");
+    });
+
+    function openAmountForm(type) {
+      transaction = type;
+      menuSection.hidden = true;
+      amountSection.hidden = false;
+      document.getElementById("amount-label").textContent =
+        type === "deposit" ? "Amount to deposit ($)" : "Amount to withdraw ($)";
+      document.getElementById("amount-submit").textContent =
+        type === "deposit" ? "Deposit" : "Withdraw";
+      amountInput.value = "";
+      amountInput.focus();
+      showMessage("");
+    }
+
+    document.getElementById("deposit-button").addEventListener("click", () => {
+      openAmountForm("deposit");
+    });
+    document.getElementById("withdraw-button").addEventListener("click", () => {
+      openAmountForm("withdraw");
+    });
+
+    document.getElementById("amount-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const enteredAmount = amountInput.value.trim();
+      if (!/^(?:\d+)(?:\.\d{1,2})?$/.test(enteredAmount)) {
+        showMessage("Enter a valid amount greater than zero with no more than two decimal places.", "error");
+        return;
+      }
+
+      const amountCents = Math.round(Number(enteredAmount) * 100);
+      if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+        showMessage("Enter a valid amount greater than zero.", "error");
+        return;
+      }
+
+      if (transaction === "withdraw" && amountCents > balanceCents) {
+        showMessage("Insufficient funds.", "error");
+        return;
+      }
+
+      balanceCents += transaction === "deposit" ? amountCents : -amountCents;
+      showMessage(
+        `${transaction === "deposit" ? "Deposit" : "Withdrawal"} successful. New balance: $${(balanceCents / 100).toFixed(2)}`,
+        "success"
+      );
+      amountSection.hidden = true;
+      menuSection.hidden = false;
+      transaction = null;
+    });
+
+    document.getElementById("cancel-button").addEventListener("click", () => {
+      amountSection.hidden = true;
+      menuSection.hidden = false;
+      transaction = null;
+      showMessage("");
+    });
+
+    document.getElementById("exit-button").addEventListener("click", () => {
+      menuSection.hidden = true;
+      amountSection.hidden = true;
+      subtitle.textContent = "Thank you for using the ATM.";
+      showMessage("Goodbye!");
+    });
+  </script>
+</body>
+</html>
